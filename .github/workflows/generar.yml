@@ -1,0 +1,37 @@
+# Cuando alguien con permiso sube una edición nueva del documento (Word o PDF) a la raíz del
+# repositorio, GitHub vuelve a generar index.html y la carpeta paginas/ a partir de ella.
+name: Regenerar la web al cambiar el documento
+
+on:
+  push:
+    branches: [main]
+    paths: ['*.pdf', '*.docx', 'fuentes/**', 'aportaciones/**']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  generar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pymupdf pillow
+      - name: Elegir el documento de la raíz (Word antes que PDF)
+        id: doc
+        run: echo "ruta=$(ls *.docx *.pdf 2>/dev/null | head -n 1)" >> "$GITHUB_OUTPUT"
+      - name: Instalar LibreOffice si el documento es de Word
+        if: endsWith(steps.doc.outputs.ruta, '.docx')
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libreoffice-writer fonts-liberation
+      - name: Generar index.html y paginas/
+        run: python fuentes/generar.py "${{ steps.doc.outputs.ruta }}" .
+      - name: Guardar el resultado en el repositorio
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A index.html paginas
+          git diff --cached --quiet || git commit -m "Regenerar la web a partir del documento"
+          git push
