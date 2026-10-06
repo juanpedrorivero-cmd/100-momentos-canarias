@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Lo único que no sale del PDF: nombres cortos de los bloques, hilos y secciones.
-Títulos, autoría, momentos pendientes y páginas los lee generar.py del propio documento."""
+Títulos, autoría (del alumnado o elaboración propia de la edición), momentos pendientes y páginas
+los lee generar.py del propio documento."""
 
 BLOQUES = [
     # (romano, nombre completo, nombre corto, etiqueta temporal; vacía si el nombre ya la dice)
@@ -62,10 +63,11 @@ OBRA = dict(
     url="",                                    # dirección pública de la web; vacía = se toma sola en GitHub Pages
     resumen=("Esta obra colectiva reúne cien momentos de la Historia de Canarias: noventa ordenados cronológicamente, "
              "desde la formación volcánica del archipiélago hasta el siglo XXI, y diez claves de larga duración que los "
-             "atraviesan. Cada estudiante investigó individualmente uno de ellos: localizó y contrastó fuentes, lo situó en "
-             "su contexto, explicó sus consecuencias y su interpretación historiográfica y comentó una imagen o un documento "
-             "histórico. El conjunto convierte esas investigaciones en una secuencia compartida, pensada para aprender y "
-             "enseñar historia desde la formación inicial del profesorado."),
+             "atraviesan. El alumnado investigó individualmente la mayor parte: cada estudiante localizó y contrastó fuentes, "
+             "situó su momento en contexto, explicó sus consecuencias y su interpretación historiográfica y comentó una imagen "
+             "o un documento histórico. Los momentos que quedaron sin aportación los desarrolló la edición docente y figuran "
+             "como elaboración propia. El conjunto convierte esas investigaciones en una secuencia compartida, pensada para "
+             "aprender y enseñar historia desde la formación inicial del profesorado."),
     palabras_clave=["Historia de Canarias", "Didáctica de las Ciencias Sociales", "formación inicial del profesorado",
                     "fuentes históricas", "obra colectiva"],
 )

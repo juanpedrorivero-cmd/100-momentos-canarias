@@ -7,7 +7,7 @@
 
 Sin carpeta de salida escribe junto a la carpeta «fuentes», es decir, en la raíz de la web.
 
-Lee del propio PDF los títulos, la autoría y qué momentos siguen pendientes; localiza dónde
+Lee del propio PDF los títulos, la autoría, qué momentos son de elaboración propia y cuáles siguen pendientes; localiza dónde
 empieza y acaba cada momento; guarda cada página como imagen (paginas/NNN.webp) y escribe
 index.html. La web muestra recortes de esas imágenes: el trabajo se ve tal como está maquetado.
 
@@ -27,6 +27,7 @@ from datos import BLOQUES, HILOS, SECCIONES, FIN_MOMENTOS, APORTACIONES, OBRA
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 ANCHO = 1240          # anchura en píxeles de cada página guardada
+PROPIA = 'Elaboración propia'   # rótulo de los momentos que desarrolló la edición docente, como en el documento
 
 
 def norm(s):
@@ -80,8 +81,8 @@ def leer(doc):
 
 def localizar(L):
     """Encabezados «N. Título» de los cien momentos, en orden. Solo cuenta el que va seguido de
-    «Autor/a del trabajo» o «Momento pendiente»: así no se confunde con el índice ni los créditos."""
-    es_marca = lambda l: l.t.startswith('autoradeltrabajo') or l.t.startswith('momentopendiente')
+    «Autor/a del trabajo», «Autoría editorial» o «Momento pendiente»: así no se confunde con el índice ni los créditos."""
+    es_marca = lambda l: l.t.startswith(('autoradeltrabajo', 'autoriaeditorial', 'momentopendiente'))
     cab, n, i = {}, 1, 0
     while i < len(L) and n <= 100:
         l = L[i]
@@ -155,21 +156,24 @@ def main():
 
     # ── títulos, autoría y pendientes ──
     fin = next((i for i in range(cab[100]['i'], len(L)) if L[i].t.startswith(norm(FIN_MOMENTOS))), len(L))
-    bloque = [i for i in range(len(L) - 1)                       # «II. Contactos…» + «10 de 10 aportaciones recibidas»
-              if L[i].negrita and re.match(r'^[IVX]+\.\s', L[i].txt) and re.match(r'^\d+ de \d+ aportaciones', L[i + 1].txt)]
+    bloque = [i for i in range(len(L) - 1)                       # «II. Contactos…» + «10 de 10 aportaciones…» o «10 de 10 momentos…»
+              if L[i].negrita and re.match(r'^[IVX]+\.\s', L[i].txt) and re.match(r'^\d+ de \d+ (aportaciones|momentos)', L[i + 1].txt)]
     M, corte = [], {}
     for n in range(1, 101):
         a = cab[n]['i']
         z = cab[n + 1]['i'] if n < 100 else fin
         z = min([b for b in bloque if a < b < z] + [z])          # antes del título del bloque siguiente
         autor = aviso = None
+        propia = False                                           # «Autoría editorial: elaboración propia»: no es un trabajo del alumnado
         for i in range(a, z):
             if autor is None and L[i].t.startswith('autoradeltrabajo'):
                 autor = (i, L[i].txt.split(':', 1)[1].strip() if ':' in L[i].txt else '')
+            if autor is None and L[i].t.startswith('autoriaeditorial'):
+                autor, propia = (i, ''), True
             if aviso is None and L[i].t.startswith('momentopendiente'):
                 aviso = i
         nombre = None if autor is None else ('' if norm(autor[1]).startswith('nombrenoconsignado') else autor[1])
-        M.append((cab[n]['titulo'], nombre))
+        M.append((cab[n]['titulo'], nombre, propia))
         corte[n] = dict(a=a, z=z, autor=autor[0] if autor else None, aviso=aviso)
 
     # ── páginas como imagen, a medida que hacen falta ──
@@ -260,7 +264,7 @@ def main():
             peso += guardar(img, os.path.join(salida, 'paginas', nombre + '.webp'))
             tr.append([nombre, round(max(0, t[0] - 5 * z) / alto * 10000), round(min(alto, t[1] + 7 * z) / alto * 10000), k])
         F[f'm{n}'] = tr
-        M[n - 1] = (M[n - 1][0], autor)
+        M[n - 1] = (M[n - 1][0], autor, False)
 
     # ── la página ──
     tpl = open(os.path.join(AQUI, 'plantilla.html'), encoding='utf-8').read()
@@ -271,9 +275,10 @@ def main():
                      f'<span class="r">{rom}</span><span class="s">{h(corto)}</span></button>')
         filas = []
         for n in ns:
-            t, a = M[n - 1]
+            t, a, propia = M[n - 1]
             cls = ('up' if n % 2 else 'dn') + (' pend' if a is None else '')
-            dentro = f'<span class="num">{n}</span><span class="tt">{h(t)}</span>' + (f'<span class="by">{h(a)}</span>' if a else '')
+            dentro = (f'<span class="num">{n}</span><span class="tt">{h(t)}</span>'
+                      + (f'<span class="by">{h(a)}</span>' if a else f'<span class="by ed">{PROPIA}</span>' if propia else ''))
             ficha = f'<span class="card">{dentro}</span>' if a is None else f'<a class="card" href="#m{n}">{dentro}</a>'
             filas.append(f'          <li class="m {cls}" data-n="{n}">{ficha}<span class="dot"></span></li>')
         linea.append(f'        <section class="era e{b}" aria-labelledby="b{b}">\n'
@@ -282,18 +287,18 @@ def main():
                      f'          <ol class="ms" start="{ns[0]}">\n' + '\n'.join(filas) + '\n          </ol>\n        </section>')
         celdas = ''.join(
             f'<span class="cell pend" data-n="{n}" aria-label="{n}. {h(M[n-1][0])}">{n}</span>' if M[n - 1][1] is None else
-            f'<a class="cell" data-n="{n}" href="#m{n}" aria-label="{n}. {h(M[n-1][0])}{". " + h(M[n-1][1]) if M[n-1][1] else ""}">{n}</a>'
+            f'<a class="cell" data-n="{n}" href="#m{n}" aria-label="{n}. {h(M[n-1][0])}{". " + h(M[n-1][1] or PROPIA) if M[n-1][1] or M[n-1][2] else ""}">{n}</a>'
             for n in ns)
         matriz.append(f'        <div class="mx-row e{b}"><span class="lab"><b>{rom}</b><span>{h(corto)}</span></span>{celdas}</div>')
         for n in ns:
-            t, a = M[n - 1]
+            t, a, _ = M[n - 1]
             if a:
                 autoria.append(f'        <li class="e{b}"><a href="#m{n}"><span class="n">{n}</span>'
                                f'<span class="a">{h(a)}</span><span class="t">{h(t)}</span></a></li>')
-    datos = dict(m=[[t, a] for t, a in M], eras=[list(b) for b in BLOQUES], hilos=[[k, nom, lst] for k, nom, lst in HILOS],
+    datos = dict(m=[[t, a, 1] if e else [t, a] for t, a, e in M], eras=[list(b) for b in BLOQUES], hilos=[[k, nom, lst] for k, nom, lst in HILOS],
                  secs=[[s[0], s[1]] for s in SECCIONES], f=F, r=round(hoja(usadas[0]).height / hoja(usadas[0]).width, 5),
                  o=dict(t=OBRA['titulo'], c=OBRA['coordinacion_cita'], y=OBRA['anio'], i=OBRA['institucion'], u=OBRA['url']))
-    firmas = list(dict.fromkeys(a for _, a in M if a))           # nombres, sin repetir y en orden
+    firmas = list(dict.fromkeys(a for _, a, _ in M if a))           # nombres, sin repetir y en orden
     ficha = {                                                     # metadatos académicos legibles por buscadores
         '@context': 'https://schema.org', '@type': 'CreativeWork', 'name': OBRA['titulo'], 'inLanguage': 'es',
         'datePublished': OBRA['anio'], 'abstract': OBRA['resumen'], 'keywords': OBRA['palabras_clave'],
@@ -308,9 +313,24 @@ def main():
     campos = {'%%TITULO%%': OBRA['titulo'], '%%INSTITUCION%%': OBRA['institucion'], '%%INSTITUCION_URL%%': OBRA['institucion_url'],
               '%%TITULACION%%': OBRA['titulacion'], '%%ASIGNATURA%%': OBRA['asignatura'], '%%CURSO%%': OBRA['curso'], '%%ANIO%%': OBRA['anio'],
               '%%COORDINACION%%': OBRA['coordinacion'], '%%COORD_CITA%%': OBRA['coordinacion_cita'], '%%RESUMEN%%': OBRA['resumen'],
-              '%%PALABRAS%%': '; '.join(OBRA['palabras_clave']) + '.', '%%N_APORT%%': str(sum(1 for _, a in M if a is not None))}
+              '%%PALABRAS%%': '; '.join(OBRA['palabras_clave']) + '.'}
+    # cuántos momentos son del alumnado y cuántos de elaboración propia: de ahí salen cuatro frases de la página
+    propias = [n for n in range(1, 101) if M[n - 1][2]]
+    alum = sum(1 for _, a, e in M if a is not None and not e)
+    quien = f'el alumnado de {OBRA["asignatura"]}, en la {OBRA["institucion"]},'
+    if propias:
+        campos['%%ENTRADA%%'] = (f'Cien procesos y acontecimientos: {alum} investigados uno a uno por {quien} y {len(propias)} desarrollados '
+                                 'por la edición docente. Abre cualquiera: se muestra tal como quedó en la edición.')
+        campos['%%AUTORIA_FICHA%%'] = (f'{alum} trabajos individuales del alumnado y {len(propias)} momentos de elaboración propia de la edición docente')
+    else:
+        campos['%%ENTRADA%%'] = (f'Cien procesos y acontecimientos que {quien} investigó uno a uno. '
+                                 'Recorre la línea y abre cualquiera: se muestra tal como quedó en la edición docente.')
+        campos['%%AUTORIA_FICHA%%'] = f'{alum} trabajos individuales del alumnado'
     for k, v in campos.items():
         tpl = tpl.replace(k, h(v))
+    tpl = tpl.replace('%%PROPIAS%%', '' if not propias else
+                      '      <p class="au-ed">' + PROPIA + ' de la edición docente, sin autoría del alumnado: '
+                      + ', '.join(f'<a href="#m{n}" title="{h(M[n - 1][0])}">{n}</a>' for n in propias) + '.</p>')
     tpl = tpl.replace('%%JSONLD%%', json.dumps(ficha, ensure_ascii=False, separators=(',', ':')).replace('</', '<\\/'))
     out = (tpl.replace('%%CINTA%%', '\n'.join(cinta))
               .replace('%%HILOS%%', '\n'.join(f'        <button class="chip" type="button" aria-pressed="false">{h(n)}</button>' for _, n, _ in HILOS))
@@ -321,8 +341,8 @@ def main():
     completo = ('<!doctype html>\n<html lang="es">\n<head>\n<meta charset="utf-8">\n'
                 '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n'
                 '<meta name="color-scheme" content="light dark">\n'
-                '<meta name="description" content="Línea temporal con los cien momentos de Historia de Canarias investigados por el alumnado de '
-                'Didáctica de las Ciencias Sociales I (Universidad de La Laguna).">\n'
+                f'<meta name="description" content="Línea temporal con cien momentos de Historia de Canarias: obra colectiva del alumnado de '
+                f'{h(OBRA["asignatura"])} ({h(OBRA["institucion"])}).">\n'
                 f'<meta name="author" content="Alumnado de {h(OBRA["asignatura"])}, {h(OBRA["institucion"])}. Coordinación: {h(OBRA["coordinacion"])}">\n'
                 + cabeza.strip() +
                 '\n<style>:root{padding-block:env(safe-area-inset-top,0px) env(safe-area-inset-bottom,0px)}</style>\n'
@@ -331,9 +351,9 @@ def main():
     if '--previa' in sys.argv:                       # extras para revisar el resultado; no forman parte de la web
         open(os.path.join(salida, 'vista-previa.html'), 'w', encoding='utf-8').write(out)
         json.dump(dict(M=M, F=F), open(os.path.join(salida, 'extraido.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
-    con = sum(1 for _, a in M if a is not None)
+    con = sum(1 for _, a, _ in M if a is not None)
     sueltas = sum(len(F[f'm{n}']) for n in APORTACIONES if f'm{n}' in F and isinstance(F[f'm{n}'][0][0], str))
-    print(f'{con} momentos con aportación, {100 - con} pendientes · {len(usadas)} páginas de la edición + {sueltas} de aportaciones sueltas ({peso / 1e6:.1f} MB) · index.html {len(completo.encode()) // 1024} KB')
+    print(f'{alum} momentos del alumnado, {len(propias)} de elaboración propia, {100 - con} pendientes · {len(usadas)} páginas de la edición + {sueltas} de aportaciones sueltas ({peso / 1e6:.1f} MB) · index.html {len(completo.encode()) // 1024} KB')
 
 
 if __name__ == '__main__':

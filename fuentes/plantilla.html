@@ -137,6 +137,7 @@ a.card:hover, a.card:focus-visible { background: var(--c); color: var(--on-era) 
 .num { width: max-content; font: 400 2.3rem/1 var(--f-display); color: var(--c) }
 .tt { font: 500 1.12rem/1.2 var(--f-display); text-wrap: balance }
 .by { margin-top: .1rem; font-size: .8rem; line-height: 1.25; color: var(--muted) }
+.by.ed { font-style: italic }
 a.card:hover .num, a.card:hover .by, a.card:focus-visible .num, a.card:focus-visible .by { color: inherit }
 .dot { position: absolute; left: 50%; top: var(--up); width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px; border-radius: 50%; background: var(--c) }
 /* momento aún sin aportación: conserva su sitio, en hueco y sin enlace */
@@ -197,6 +198,8 @@ a.cell:hover, a.cell:focus-visible { scale: 1.12 }
 .au .n { grid-row: span 2; font: 400 1.5rem/1.05 var(--f-display); color: var(--c) }
 .au .a { font: 500 1.1rem/1.25 var(--f-display) }
 .au .t { font-size: .84rem; line-height: 1.3; color: var(--muted) }
+.au-ed { max-width: 46rem; margin: 1.4rem 0 0; font-size: .9rem; line-height: 1.5; color: var(--muted) }
+.au-ed a { color: var(--ink); text-underline-offset: .2em; text-decoration-color: var(--muted) }
 /* Sobre esta obra: como la primera página de un artículo */
 .obra { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 1.5rem clamp(2rem, 5vw, 5rem); align-items: start; max-width: 76rem; margin-top: 1rem }
 .obra h3 { margin: 1.5rem 0 .35rem; font: 600 .86rem/1.3 var(--f-text); color: var(--muted) }
@@ -340,7 +343,7 @@ footer a { text-underline-offset: .2em }
     <section class="hero">
       <div>
         <h1>100 momentos de Historia de Canarias</h1>
-        <p class="lede">Cien procesos y acontecimientos que el alumnado de Didáctica de las Ciencias Sociales I, en la Universidad de La Laguna, investigó uno a uno. Recorre la línea y abre cualquiera: se muestra tal como quedó en la edición docente.</p>
+        <p class="lede">%%ENTRADA%%</p>
         <p class="doclinks">El documento se abre con una <a href="#introduccion">introducción</a> y se cierra con la <a href="#conclusion">conclusión general del profesor</a>. Resumen, ficha y cita en <a href="#obra">Sobre esta obra</a>.</p>
       </div>
       <figure class="isles">
@@ -396,6 +399,7 @@ footer a { text-underline-offset: .2em }
       <ol class="au">
 %%AUTORIA%%
       </ol>
+%%PROPIAS%%
     </section>
 
     <section class="sec" id="obra">
@@ -409,7 +413,7 @@ footer a { text-underline-offset: .2em }
           <h3>Cita sugerida</h3>
           <p class="cite" id="cite-obra">%%COORD_CITA%% (coord.) (%%ANIO%%). <i>%%TITULO%%</i>. Obra colectiva del alumnado de %%ASIGNATURA%%. %%INSTITUCION%%.</p>
           <button class="copy" type="button" data-copy="cite-obra">Copiar la cita</button>
-          <p class="mini">Cada momento tiene además su propia cita, con el nombre de quien lo investigó, al abrirlo.</p>
+          <p class="mini">Cada momento tiene además su propia cita, con su autoría, al abrirlo.</p>
         </div>
         <dl class="ficha">
           <div><dt>Institución</dt><dd><a href="%%INSTITUCION_URL%%">%%INSTITUCION%%</a></dd></div>
@@ -417,7 +421,7 @@ footer a { text-underline-offset: .2em }
           <div><dt>Asignatura</dt><dd>%%ASIGNATURA%%</dd></div>
           <div><dt>Curso</dt><dd>%%CURSO%%</dd></div>
           <div><dt>Coordinación docente</dt><dd>%%COORDINACION%%</dd></div>
-          <div><dt>Autoría</dt><dd>%%N_APORT%% trabajos individuales del alumnado</dd></div>
+          <div><dt>Autoría</dt><dd>%%AUTORIA_FICHA%%</dd></div>
           <div><dt>Estructura de cada momento</dt><dd>Contexto previo, desarrollo histórico, consecuencias y transformaciones, clave interpretativa, imagen o documento comentado y referencias</dd></div>
         </dl>
       </div>
@@ -482,6 +486,7 @@ document.addEventListener('click', e => {
   if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(src.textContent.trim()).then(() => say('Cita copiada', 1800), pick);
   else pick();
 });
+const PROPIA = 'Elaboración propia';                                /* momentos que desarrolló la edición docente */
 const has = n => n >= 1 && n <= 100 && D.m[n - 1][1] !== null;      /* ¿tiene aportación? */
 /* siguiente momento con aportación en un sentido; 0 si no hay */
 const step = (n, d) => { for (let k = n + d; k >= 1 && k <= 100; k += d) if (has(k)) return k; return 0; };
@@ -633,7 +638,7 @@ chips.forEach((c, i) => c.addEventListener('click', () => {
   focusOn(list, `<b>${name}</b> pasa por ${list.length} momentos y termina en la clave ${key} del bloque X.`, true);
   hop(1);
 }));
-const hay = D.m.map(([t, a], i) => norm(`${i + 1} ${t} ${a || ''}`));
+const hay = D.m.map(([t, a, e], i) => norm(`${i + 1} ${t} ${a || ''} ${e ? PROPIA + ' edición docente' : ''}`));
 let qTimer = 0;
 $('#q').addEventListener('input', e => {
   const raw = e.target.value.trim(), q = norm(raw);
@@ -660,7 +665,7 @@ function showCap(n) {
   mxcap.textContent = '';
   mxcap.className = 'mx-cap e' + eraOf(n);
   mxcap.append(el('span', 'n', n), el('span', 't', D.m[n - 1][0]));
-  if (D.m[n - 1][1]) mxcap.append(el('span', 'a', D.m[n - 1][1]));
+  if (D.m[n - 1][1] || D.m[n - 1][2]) mxcap.append(el('span', 'a', D.m[n - 1][1] || PROPIA));
 }
 showCap(1);
 function cap(e) {
@@ -767,7 +772,7 @@ function fill(key) {
     $('#sh-era').textContent = `Bloque ${b[0]}. ${b[1]}` + (b[3] ? `, ${b[3]}` : '');
     $('#sh-num').textContent = n;
     $('#sh-title').textContent = D.m[n - 1][0];
-    $('#sh-by').textContent = D.m[n - 1][1] ? 'Trabajo de ' + D.m[n - 1][1] : '';
+    $('#sh-by').textContent = D.m[n - 1][1] ? 'Trabajo de ' + D.m[n - 1][1] : D.m[n - 1][2] ? PROPIA + ' de la edición docente' : '';
     D.hilos.forEach(([, name, list]) => {
       const open = list.filter(has), i = open.indexOf(n);
       if (i < 0 || open.length < 2) return;
@@ -791,7 +796,7 @@ function fill(key) {
     preload('m' + step(n, 1));
     const who = D.m[n - 1][1], cite = $('#sh-cite');
     cite.textContent = '';
-    cite.append(who ? `${who} (${D.o.y}). «${D.m[n - 1][0]}». ` : `«${D.m[n - 1][0]}» (${D.o.y}). `, `En ${D.o.c} (coord.), `, el('i', null, D.o.t),
+    cite.append(who ? `${who} (${D.o.y}). «${D.m[n - 1][0]}». ` : `«${D.m[n - 1][0]}» (${D.o.y}). ` + (D.m[n - 1][2] ? PROPIA + ' de la edición docente. ' : ''), `En ${D.o.c} (coord.), `, el('i', null, D.o.t),
       ` (momento ${n}). ${D.o.i}.` + (BASE ? ` ${BASE}#m${n}` : ''));
     $('#sh-citebox').hidden = false;
     document.title = `${n}. ${D.m[n - 1][0]} | 100 momentos de Historia de Canarias`;
